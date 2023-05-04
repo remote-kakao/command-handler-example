@@ -1,10 +1,19 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { Server } from "@remote-kakao/core";
+import { UDPServer } from "@remote-kakao/core";
+import { RKEvalPlugin } from "@remote-kakao/rkeval-plugin";
+import { LoggerPlugin } from "./plugins";
 import Command from "./lib/command";
 
+const prefix = ">";
 const port = Number(process.env.PORT || 3000);
-const server = new Server();
+const server = new UDPServer({ serviceName: "remote-kakao" });
+
+server.usePlugin(RKEvalPlugin);
+server.usePlugin(LoggerPlugin, {
+	logFilePath: join(process.cwd(), "messages.log"),
+	enableAppInfo: true,
+});
 
 const commands: { [command: string]: ReturnType<typeof Command> } = {};
 
@@ -20,7 +29,6 @@ readdirSync(join(__dirname, "./commands")).map((fileName) => {
 });
 
 server.on("message", (msg) => {
-	const prefix = ">";
 	const args = msg.content.split(" ");
 	const cmd = args.shift()?.slice(prefix.length);
 	if (!cmd || !Object.keys(commands).includes(cmd)) return;
@@ -28,6 +36,4 @@ server.on("message", (msg) => {
 	commands[cmd](msg, args, server);
 });
 
-server
-	.start(port)
-	.then(() => console.log(`remote-kakao started on port ${port}`));
+server.start(port);
